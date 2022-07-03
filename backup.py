@@ -2,6 +2,7 @@
 # Author: Abhijeet Singh (@abhiunix)
 # Date: 23 Jan 2022
 # Twitter: https://twitter.com/abhiunix
+# Modified by leancode
 
 import requests
 import os
@@ -10,13 +11,13 @@ import time
 import subprocess 
 
 
-#Please put your telegram_apikey & telegram_chat_id in uniqXkeys.conf file. Location $HOME/.config/uniqXkeys/uniqXkeys.conf
+#Please put your telegram_apikey & telegram_chat_id in telegram_backup.conf file. Location $HOME/.config/telegram_backup/telegram_backup.conf
 
 
 home =  subprocess.Popen("echo $HOME", shell=True, stdout=subprocess.PIPE).stdout
 enc_home =  home.read()
 str1=enc_home.decode().strip()
-conf='/.config/uniqXkeys/uniqXkeys.conf'
+conf='/.config/telegram_backup/telegram_backup.conf'
 
 fileName = str1+conf
 fileObj = open(fileName)
@@ -39,9 +40,9 @@ currentTime = time.strftime("%H-%M-%S", t)
 
 currentDir=str(os.getcwd())
 
-os.system("zip -r {}-{}.backup.zip .".format(currentdate, currentTime))
-files={'document':open('{}-{}.backup.zip'.format(currentdate, currentTime),'rb')}
-resp= requests.post('https://api.telegram.org/bot{}/sendDocument?chat_id={}&caption=backup of {} {}-{}.backup.zip'.format(telegram_apikey,telegram_chat_id,currentDir, currentdate, currentTime), files=files)
+os.system("zip -r {}-{}-{}.backup.zip .".format(currentDir, currentdate, currentTime))
+files={'document':open('{}-{}-{}.backup.zip'.format(currentDir, currentdate, currentTime),'rb')}
+resp= requests.post('https://api.telegram.org/bot{}/sendDocument?chat_id={}&caption=backup of {} {}-{}-{}.backup.zip'.format(telegram_apikey,telegram_chat_id,currentDir, currentdate, currentTime), files=files)
 
 os.system("rm -r *.zip")
 
