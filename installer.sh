@@ -2,6 +2,7 @@
 # Author: Abhijeet Singh (@abhiunix)
 # Date: 23 Jan 2022
 # Twitter: https://twitter.com/abhiunix
+# Modified by: leancode
 
 echo "Installing and setting up the backup script."
 echo ""
@@ -17,30 +18,16 @@ else
     echo ""
     echo "Most linux OS uses this command to install zip. $ apt install zip. If you are on macOS then run this command: $ brew install zip"
     echo ""
-    unameVar=$(uname -a)
-
-    if [[ $unameVar == *"Linux"* ]]; then
-      echo "Looks like you are using Linux OS. Running 'sudo apt install zip'"
-      echo ""
-      sudo apt install zip
-      exit
-    elif [[ $unameVar == *"Darwin"* ]]; then
-      echo "Looks like you are using macOS. Running 'brew install zip'"
-      brew install zip
-      exit
-    else
-      echo "We are not able to identify the device. Please contact https://twitter.com/abhiunix"
-    fi
   exit
 
 fi
 
-if [ -e $HOME/.config/uniqXkeys/uniqXkeys.conf ]; then 
-echo "uniqXkeys.conf File exists."
+if [ -e $HOME/.config/telegram_backup/telegram_backup.conf ]; then 
+echo "telegram_backup.conf File exists."
 echo ""
-echo "Below are the contents of $HOME/.config/uniqXkeys/uniqXkeys.conf "
+echo "Below are the contents of $HOME/.config/telegram_backup/telegram_backup.conf "
 echo ""
-cat $HOME/.config/uniqXkeys/uniqXkeys.conf
+cat $HOME/.config/telegram_backup/telegram_backup.conf
 echo ""
 echo ""
 read -p "Do you want to update it?[yes/no] " in3
@@ -50,9 +37,9 @@ echo ""
       read -p "Please enter your new telegram_apikey: " in1
       read -p "Please update your new telegram_chat_id: " in2
       echo ""
-      echo "" > $HOME/.config/uniqXkeys/uniqXkeys.conf
-      echo "telegram_apikey=$in1" >> $HOME/.config/uniqXkeys/uniqXkeys.conf
-      echo "telegram_chat_id=$in2" >> $HOME/.config/uniqXkeys/uniqXkeys.conf
+      echo "" > $HOME/.config/telegram_backup/telegram_backup.conf
+      echo "telegram_apikey=$in1" >> $HOME/.config/telegram_backup/telegram_backup.conf
+      echo "telegram_chat_id=$in2" >> $HOME/.config/telegram_backup/telegram_backup.conf
       echo ""
       echo "telegram_apikey and telegram_chat_id has been updated successfully"
       
@@ -66,27 +53,27 @@ echo ""
 
 
 else 
-echo "uniqXkeys.conf file doesn't exists" 
+echo "telegram_backup.conf file doesn't exists" 
 echo ""
 echo "Set-up the telegram_apikey and telegram_chat_id "
 echo ""
-mkdir -p $HOME/.config/uniqXkeys/
-touch $HOME/.config/uniqXkeys/uniqXkeys.conf
+mkdir -p $HOME/.config/telegram_backup/
+touch $HOME/.config/telegram_backup/telegram_backup.conf
 echo ""
 read -p "Please enter your telegram_apikey: " in1
 read -p "Please enter your telegram_chat_id: " in2
 echo ""
-echo "telegram_apikey=$in1" >> $HOME/.config/uniqXkeys/uniqXkeys.conf
-echo "telegram_chat_id=$in2" >> $HOME/.config/uniqXkeys/uniqXkeys.conf
+echo "telegram_apikey=$in1" >> $HOME/.config/telegram_backup/telegram_backup.conf
+echo "telegram_chat_id=$in2" >> $HOME/.config/telegram_backup/telegram_backup.conf
 echo ""
 echo "telegram_apikey and telegram_chat_id has been set."
 fi 
 
 chmod 777 *
-echo "Setting up backup.py in /usr/local/bin/ as 'backup'."
-cp backup.py backup
-sudo cp backup /usr/local/bin/
-echo "Giving executable permission for /usr/local/bin/backup"
-sudo chmod 777 /usr/local/bin/backup
-rm -r backup
-echo "Great!! Now you can use 'backup' from anywhere. Just type 'backup'."
+echo "Setting up backup.py in /usr/local/bin/ as 'telegram_backup'."
+cp backup.py telegram_backup
+sudo cp telegram_backup /usr/local/bin/
+echo "Giving executable permission for /usr/local/bin/telegram_backup"
+sudo chmod 777 /usr/local/bin/telegram_backup
+rm -r telegram_backup
+echo "Great!! Now you can use 'telegram_backup' from anywhere. Just type 'telegram_backup'."
