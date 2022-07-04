@@ -44,9 +44,9 @@ Version 0.1.0
         -h,     --help               Display this help and exit
         -v,     --version            Output version information and exit
 
-    Example for wordpress:
+    Minimal example for Wordpress:
     telegram_backup --telegram-chat-id=569502265 --telegram-bot-token=UU7grZ_ZunE-9ijNeq5dmE4t-u85gTzrNdc
 
-    Example for none wordpress:
+    Minimal example for other web apps:
     telegram_backup --not-wordpress --use-mysql-config --telegram-chat-id=569502265 --telegram-bot-token=UU7grZ_ZunE-9ijNeq5dmE4t-u85gTzrNdc
 ```
