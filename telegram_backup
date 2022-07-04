@@ -138,7 +138,7 @@ function _print_powered_by()
 '
     cat <<EOF
 ${_green}
-Powered By:
+Made with:
 $mp_ascii
 ${_reset}
 EOF
@@ -424,17 +424,19 @@ function send_to_telegram()
         zip -q -r -s 49m "$PARTIAL_ZIP_FILE.zip" "$ZIPPED_BACKUP_FILE"
         NUMBER_OF_PARTS=$(($BACKUP_SIZE / 49000000))
     	_success "Done!"
-        _success "Sending parts to Telegram..."
+        _success "Sending 1 of $(($NUMBER_OF_PARTS+1)) to Telegram..."
         telegram_send_document "$PARTIAL_ZIP_FILE.zip" "Part 1 of $DIR_CURRENT multipart backup"
         rm "$PARTIAL_ZIP_FILE.zip"
+    	_success "Done!"
         COUNTER=2
         for i in $(seq -f "%02g" 1 $NUMBER_OF_PARTS); do
+            _success "Sending $COUNTER of $(($NUMBER_OF_PARTS+1)) to Telegram..."
             telegram_send_document "$PARTIAL_ZIP_FILE.z$i" "Part $COUNTER of $DIR_CURRENT multipart backup"
             COUNTER=$COUNTER+1
             rm "$PARTIAL_ZIP_FILE.z$i"
+        	_success "Done!"
         done
     fi
-	_success "Done!"
     telegram_send_message "\-----End $DIR_CURRENT backup $HUMAN_DATETIME"
     
     if [ $KEEP_BACKUPS_FOR -eq 0 ]; then
