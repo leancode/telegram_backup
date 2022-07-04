@@ -1,51 +1,474 @@
-#!/usr/bin/env python3
-# Author: Abhijeet Singh (@abhiunix)
-# Date: 23 Jan 2022
-# Twitter: https://twitter.com/abhiunix
-# Modified by leancode
+#!/bin/bash
 
-import requests
-import os
-from datetime import date
-import time
-import subprocess 
+#
+# Script to backup Codebase + MySQL Database
+# UnComment it if bash is lower than 4.x version
+# shopt -s extglob
+
+################################################################################
+# CORE FUNCTIONS - Do not edit
+################################################################################
+#
+# VARIABLES
+#
+_bold=$(tput bold)
+_underline=$(tput sgr 0 1)
+_reset=$(tput sgr0)
+
+_purple=$(tput setaf 171)
+_red=$(tput setaf 1)
+_green=$(tput setaf 76)
+_tan=$(tput setaf 3)
+_blue=$(tput setaf 38)
+
+#
+# HEADERS & LOGGING
+#
+function _debug()
+{
+    if [[ "$DEBUG" = 1 ]]; then
+        "$@"
+    fi
+}
+
+function _header()
+{
+    printf '\n%s%s==========  %s  ==========%s\n' "$_bold" "$_purple" "$@" "$_reset"
+}
+
+function _arrow()
+{
+    printf '➜ %s\n' "$@"
+}
+
+function _success()
+{
+    printf '%s✔ %s%s\n' "$_green" "$@" "$_reset"
+}
+
+function _error() {
+    printf '%s✖ %s%s\n' "$_red" "$@" "$_reset"
+}
+
+function _warning()
+{
+    printf '%s➜ %s%s\n' "$_tan" "$@" "$_reset"
+}
+
+function _underline()
+{
+    printf '%s%s%s%s\n' "$_underline" "$_bold" "$@" "$_reset"
+}
+
+function _bold()
+{
+    printf '%s%s%s\n' "$_bold" "$@" "$_reset"
+}
+
+function _note()
+{
+    printf '%s%s%sNote:%s %s%s%s\n' "$_underline" "$_bold" "$_blue" "$_reset" "$_blue" "$@" "$_reset"
+}
+
+function _die()
+{
+    _error "$@"
+    exit 1
+}
+
+function _safe_exit()
+{
+    exit 0
+}
+
+#
+# UTILITY HELPER
+#
+function _seek_confirmation()
+{
+  printf '\n%s%s%s' "$_bold" "$@" "$_reset"
+  read -p " (y/n) " -n 1
+  printf '\n'
+}
+
+# Test whether the result of an 'ask' is a confirmation
+function _is_confirmed()
+{
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+        return 0
+    fi
+    return 1
+}
 
 
-#Please put your telegram_apikey & telegram_chat_id in telegram_backup.conf file. Location $HOME/.config/telegram_backup/telegram_backup.conf
+function _type_exists()
+{
+    if type "$1" >/dev/null; then
+        return 0
+    fi
+    return 1
+}
 
+function _is_os()
+{
+    if [[ "${OSTYPE}" == $1* ]]; then
+      return 0
+    fi
+    return 1
+}
 
-home =  subprocess.Popen("echo $HOME", shell=True, stdout=subprocess.PIPE).stdout
-enc_home =  home.read()
-str1=enc_home.decode().strip()
-conf='/.config/telegram_backup/telegram_backup.conf'
+function _check_root_user()
+{
+    #if [ "$(id -u)" != "0" ]; then
+    if [ "$(whoami)" != 'root' ]; then
+        echo "You have no permission to run $0 as non-root user. Use sudo"
+        exit 1;
+    fi
 
-fileName = str1+conf
-fileObj = open(fileName)
+}
 
-params={}
+function _print_powered_by()
+{
+    local mp_ascii
+    mp_ascii='
+▀██▀─▄███▄─▀██─██▀██▀▀█
+─██─███─███─██─██─██▄█
+─██─▀██▄██▀─▀█▄█▀─██▀█
+▄██▄▄█▀▀▀─────▀──▄██▄▄█
+'
+    cat <<EOF
+${_green}
+Powered By:
+$mp_ascii
+${_reset}
+EOF
+}
 
-for line in fileObj:
-	line = line.strip()
-	key_value=line.split("=")
-	if len(key_value) == 2:
-		params[key_value[0]] = key_value[1]
+################################################################################
+# SCRIPT FUNCTIONS
+################################################################################
+function _print_usage()
+{
+    echo -n "$(basename "$0") [OPTION]...
 
-telegram_apikey = params['telegram_apikey']
-telegram_chat_id = params['telegram_chat_id']
+Backup Wordpress Codebase + Database.
+Version $VERSION
 
+    Options:
+        -tc,    --telegram-chat-id   Telegram chat_id - mandatory
+        -tt,    --telegram-bot-token Telegram bot token - mandatory
+        -bd,    --dir-to-backup      Directory to backup - default=$(pwd)/html
+        -bs,    --storage-dir        Backup storage directory - default=$(pwd)/backups
+        -uc,    --use-mysql-config   Use MySQL config file (~/.my.cnf)
+        -bn,    --backup-name        Backup filename without extension - default ${DIR_CURRENT}
+        -bk,    --backup-keep-days   Days of backup to keep in storage - default 0 (none)
+        -nw,    --not-wordpress      This is not a workdpress backup - default is wordpress
+        -dh     --database-host      Database host - mandatory for not wordpress unless using MySQL config
+        -dn     --database-name      Database name - mandatory for not wordpress unless using MySQL config
+        -dp     --database-pass      Database name - mandatory for not wordpress unless using MySQL config
+        -h,     --help               Display this help and exit
+        -v,     --version            Output version information and exit
 
-currentdate = date.today()
-t = time.localtime()
-currentTime = time.strftime("%H-%M-%S", t)
+    Examples:
+       $(basename "$0") --telegram-chat-id=569502265 --telegram-bot-token=UU7grZ_ZunE-9ijNeq5dmE4t-u85gTzrNdc
+"
+    _print_powered_by
+    exit 1
+}
 
-currentDir=str(os.getcwd())
+function check_cmd_dependencies()
+{
+    local _dependencies=(
+      wget
+      cat
+      basename
+      mkdir
+      cp
+      mv
+      rm
+      chown
+      chmod
+      date
+      find
+      awk
+      gzip
+      gunzip
+    )
 
-os.system("zip -r {}-{}-{}.backup.zip .".format(currentDir, currentdate, currentTime))
-files={'document':open('{}-{}-{}.backup.zip'.format(currentDir, currentdate, currentTime),'rb')}
-resp= requests.post('https://api.telegram.org/bot{}/sendDocument?chat_id={}&caption=backup of {} {}-{}-{}.backup.zip'.format(telegram_apikey,telegram_chat_id,currentDir, currentdate, currentTime), files=files)
+    for cmd in "${_dependencies[@]}"
+    do
+        hash "${cmd}" &>/dev/null || _die "'${cmd}' command not found."
+    done;
+}
 
-os.system("rm -r *.zip")
+function process_args()
+{
+    # Parse Arguments
+    for arg in "$@"
+    do
+        case $arg in
+            -tc=*|--telegram-chat-id=*)
+                TG_CHAT_ID="${arg#*=}"
+            ;;
+            -tt=*|--telegram-bot-token=*)
+                TG_BOT_TOKEN="${arg#*=}"
+            ;;
+            -bd=*|--dir-to-backup=*)
+                DIR_TO_BACKUP="${arg#*=}"
+            ;;
+            -bs=*|--storage-dir=*)
+                BACKUP_STORAGE_DIR="${arg#*=}"
+            ;;
+            -uc|--use-mysql-config)
+                USE_MYSQL_CONFIG=1
+            ;;
+            -bk=*|--backup-keep-days=*)
+                KEEP_BACKUPS_FOR="${arg#*=}"
+            ;;
+            -bn=*|--backup-name=*)
+                BACKUP_NAME="${arg#*=}.$DATETIME"
+            ;;
+            -nw|--not-wordpress)
+                IS_WORDPRESS=0
+            ;;
+            -dh=*|--database-host=*)
+                DATABASE_HOST="${arg#*=}"
+            ;;
+            -dn=*|--database-name=*)
+                DATABASE_NAME="${arg#*=}"
+            ;;
+            -dp=*|--database-pass=*)
+                DATABASE_PASS="${arg#*=}"
+            ;;
+            --debug)
+                DEBUG=1
+                set -o xtrace
+            ;;
+            -h|--help)
+                _print_usage
+            ;;
+            *)
+                #_print_usage
+            ;;
+        esac
+    done
 
-print("{}-{}-backup.zip sent to telegram.".format(currentdate, currentTime))
+    validate_args
+    sanitize_args
+}
 
-print("If you are not getting the file on your telegram, please make sure you have installed the script correctly. Run $bash installer.sh")
+function init_default_args()
+{
+    DIR_CURRENT=${PWD##*/}
+    # to correct for the case where PWD=/ otherwise it would be blank
+    DIR_CURRENT=${DIR_CURRENT:-/}
+    DATETIME=$(date +"%Y-%m-%dT%H-%M-%S")
+    BACKUP_NAME="$DIR_CURRENT-$DATETIME"
+    DIR_TO_BACKUP=html
+    DIR_TO_BACKUP_ABS=$(pwd)/$DIR_TO_BACKUP
+    BACKUP_STORAGE_DIR=backups
+    BACKUP_STORAGE_DIR_ABS=$(pwd)/$BACKUP_STORAGE_DIR
+    USE_MYSQL_CONFIG=0
+    IS_WORDPRESS=1
+    BACKUP_FILE=
+    KEEP_BACKUPS_FOR=0
+    IGNORE_DB="(^mysql|_schema$)"
+}
+
+function validate_args()
+{
+    ERROR_COUNT=0
+
+    if [[ -z "$TG_CHAT_ID" ]]; then
+        _error "Telegram chat_id must be given: --telegram-chat-id=569502265"
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+    fi
+
+    if [[ -z "$TG_BOT_TOKEN" ]]; then
+        _error "Telegram bot token must be given: --telegram-bot-token=UU7grZ_ZunE-9ijNeq5dmE4t-u85gTzrNdc"
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+    fi
+
+    if [[ ! -z "$DIR_TO_BACKUP_ABS" && ! -f "$DIR_TO_BACKUP_ABS/wp-config.php" ]]; then
+        _error "Directory to backup must be Wordpress root folder."
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+    fi
+
+    if [[ ! -z "$BACKUP_STORAGE_DIR_ABS" ]] && ! mkdir -p "$BACKUP_STORAGE_DIR_ABS"; then
+        _error "Unable to create destination directory."
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+    fi
+
+    #echo "$ERROR_COUNT"
+    [[ "$ERROR_COUNT" -gt 0 ]] && exit 1
+}
+
+function sanitize_args()
+{
+    # remove trailing /
+    if [[ ! -z "$DIR_TO_BACKUP_ABS" ]]; then
+        DIR_TO_BACKUP_ABS="${DIR_TO_BACKUP_ABS%/}"
+    fi
+
+    if [[ ! -z "$BACKUP_STORAGE_DIR_ABS" ]]; then
+        BACKUP_STORAGE_DIR_ABS="${BACKUP_STORAGE_DIR_ABS%/}"
+    fi
+}
+
+function create_backup()
+{
+    _success "Dumping MySQL..."
+    BACKUP_FILE="${BACKUP_STORAGE_DIR_ABS}/${BACKUP_NAME}"
+    local host username password db_name
+
+    host=$(grep DB_HOST "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d "'" -f 4)
+    if [[ -z "$host" ]]; then
+        host=$(grep DB_HOST "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
+    fi  
+
+    username=$(grep DB_USER "${DIR_TO_BACKUP_ABS}/wp-config.php" | cut -d "'" -f 4)
+    if [[ -z "$username" ]]; then
+        username=$(grep DB_USER "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
+    fi  
+
+    password=$(grep DB_PASSWORD "${DIR_TO_BACKUP_ABS}/wp-config.php" | cut -d "'" -f 4)
+    if [[ -z "$password" ]]; then
+        password=$(grep DB_PASSWORD "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
+    fi  
+
+    db_name=$(grep DB_NAME "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d "'" -f 4)
+    if [[ -z "$db_name" ]]; then
+        db_name=$(grep DB_NAME "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
+    fi  
+
+    # @todo option to skip log tables
+    if [[ "$USE_MYSQL_CONFIG" -eq 1 ]]; then
+        mysqldump --single-transaction "$db_name" > "$BACKUP_FILE.sql"
+    else
+        mysqldump --single-transaction -h "$host" -u "$username" -p"$password" "$db_name" > "$BACKUP_FILE.sql"
+    fi 	
+    _success "Done!"
+
+    _success "Archiving Codebase..."
+    declare -a EXC_PATH
+    if [[ "$IS_WORDPRESS" == 1 ]]; then    
+        EXC_PATH[1]=./.git
+        EXC_PATH[2]=./wp-content/cache
+        EXC_PATH[3]=./wp-content/upgrade
+    fi
+
+    EXCLUDES=''
+    for i in "${!EXC_PATH[@]}" ; do
+        CURRENT_EXC_PATH=${EXC_PATH[$i]}
+        # note the trailing space
+        EXCLUDES="${EXCLUDES}--exclude=${CURRENT_EXC_PATH} "
+    done
+
+    tar -cf "$BACKUP_FILE.code.tar" ${EXCLUDES} -C "${DIR_TO_BACKUP_ABS}" .
+
+	_success "Done!"
+
+    _success "Compressing Archives..."
+
+    BACKUP_FILE_STRIPPED="${BACKUP_FILE:1}"
+    tar -c -C / -f "$BACKUP_FILE-backup" "$BACKUP_FILE_STRIPPED.sql" "$BACKUP_FILE_STRIPPED.code.tar"
+    
+    gzip -9 -S ".zip" -f "$BACKUP_FILE-backup"
+
+    rm "$BACKUP_FILE.sql"
+    rm "$BACKUP_FILE.code.tar"
+	_success "Done!"
+}
+
+function delete_old_backups() {
+    if [ $KEEP_BACKUPS_FOR -ne 0 ]; then
+        find $BACKUP_STORAGE_DIR -type f -name "*.zip" -mtime +$KEEP_BACKUPS_FOR -exec rm {} \;
+    else
+        find $BACKUP_STORAGE_DIR -type f -name "*.zip" -exec rm {} \;        
+    fi
+}
+
+function print_success_message()
+{
+    _success "Backup Completed!"
+    if [ $KEEP_BACKUPS_FOR -ne 0 ]; then
+        _success "Backup File    : $BACKUP_FILE-backup.tar.zip"
+    fi
+    _print_powered_by
+}
+
+function telegram_send_message() {
+    curl -F chat_id="$TG_CHAT_ID" -F text="$1" https://api.telegram.org/bot$TG_BOT_TOKEN/sendMessage &> /dev/null
+}
+
+function telegram_send_document() {
+    curl -F chat_id="$TG_CHAT_ID" -F document=@"$1" -F caption="$2" https://api.telegram.org/bot$TG_BOT_TOKEN/sendDocument &> /dev/null
+}
+
+function send_to_telegram()
+{
+    _success "Preparing to send to Telegram..."
+    ZIPPED_BACKUP_FILE="$BACKUP_FILE-backup.zip"
+    BACKUP_SIZE=$(stat -c%s "$ZIPPED_BACKUP_FILE")
+    HUMAN_DATETIME=$(date +"%d %B %Y %H:%M")
+    
+    telegram_send_message "/-----Begin $DIR_CURRENT backup $HUMAN_DATETIME"
+    if [ $BACKUP_SIZE -le 49000000 ]; then
+        # Send backup file to Telegram
+    	_success "Done!"
+        _success "Sending to Telegram..."
+        telegram_send_document $ZIPPED_BACKUP_FILE "This is a backup of $DIR_CURRENT"
+    else
+        # Split backup file, then send to Telegram
+        PARTIAL_ZIP_FILE="${BACKUP_STORAGE_DIR_ABS}/partial-${BACKUP_NAME}-backup.tar"
+        zip -q -r -s 49m "$PARTIAL_ZIP_FILE.zip" "$ZIPPED_BACKUP_FILE"
+        NUMBER_OF_PARTS=$(($BACKUP_SIZE / 49000000))
+    	_success "Done!"
+        _success "Sending parts to Telegram..."
+        telegram_send_document "$PARTIAL_ZIP_FILE.zip" "Part 1 of $DIR_CURRENT multipart backup"
+        rm "$PARTIAL_ZIP_FILE.zip"
+        COUNTER=2
+        for i in $(seq -f "%02g" 1 $NUMBER_OF_PARTS); do
+            telegram_send_document "$PARTIAL_ZIP_FILE.z$i" "Part $COUNTER of $DIR_CURRENT multipart backup"
+            COUNTER=$COUNTER+1
+            rm "$PARTIAL_ZIP_FILE.z$i"
+        done
+    fi
+	_success "Done!"
+    telegram_send_message "\-----End $DIR_CURRENT backup $HUMAN_DATETIME"
+    
+    if [ $KEEP_BACKUPS_FOR -eq 0 ]; then
+        rm $ZIPPED_BACKUP_FILE
+    fi
+}
+
+################################################################################
+# Main
+################################################################################
+export LC_CTYPE=C
+export LANG=C
+
+DEBUG=0
+_debug set -x
+VERSION="0.1.0"
+
+function main()
+{
+    #_check_root_user
+    check_cmd_dependencies
+    init_default_args
+
+    [[ $# -lt 1 ]] && _print_usage
+
+    process_args "$@"
+
+    create_backup
+    send_to_telegram
+    print_success_message
+    delete_old_backups
+    exit 0
+}
+
+main "$@"
+
+_debug set +x
