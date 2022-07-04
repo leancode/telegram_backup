@@ -1,54 +1,51 @@
-# backup everything using your telegram bot.
+# Backup everything using your telegram bot.
 
 
-A script to create a backup of the files in current directory and sending it to your telegram bot.
+A script to create a backup of the files of the html directory and mysql and sending it to your telegram group.
 
-## Installation:
-```
-./installer.sh
-```
-Provide your telegram_apikey and telegram_chat_id.
+Originally designed for Wordpress it will also work for others.
+
+In our use case all applications are installed under /home/ and telegram_backup in /usr/local/bin. Lets say we have a Wordpress app in /home/wordpress and a non Wordpress web app in /home/webapp. The web roots are in /home/wordpress/html and /home/webapp/html. The Wordpress app is owned by user wordpress and the web app by user webapp.
+
+You need to provide your telegram_apikey and telegram_chat_id on the command line. This will show up in the bash history if run manually, but not if run as cron which is what we do.
+
+- Install Telegram,
+- Create a Bot using the Telegram BotFather
+- Follow the prompts, and finally copy it’s API Token,
+- Create a Group,
+- Add the Bot to it,
+- Select the Bot User from the Group members list,
+- Press the SEND MESSAGE button (to send the start),
+- Send the User a message.
+- Retrieve the Chat ID from the chat data using this tool. 
+- Check the js code if you like in the sandbox before putting your token in
  
- ![](https://raw.githubusercontent.com/abhiunix/images/main/1.png)
-
-
-# To get your own telegram_apikey & telegram_chat_id:
-
-## Get your telegram_apikey:
-
-Open Telegram and search for @BotFather, send him a “/start” message or click on "https://t.me/BotFather".
-> ![](https://raw.githubusercontent.com/abhiunix/notify/master/Supporting_Material/step1.png)
-
-
-Now Send another message “/newbot” then follow the instructions to setup a name and a username.
-> ![](https://raw.githubusercontent.com/abhiunix/notify/master/Supporting_Material/step2.png)
-
-
-
-You will get your token to access the HTTP API, this HTTP API token is your bot_token.
-> ![](https://raw.githubusercontent.com/abhiunix/notify/master/Supporting_Material/step3.png)
-
-### Get your telegram_chat_id:
-
-Now Open Telegram and search for @chat_id_echo_bot, send him a “/start” message or click on "https://t.me/chat_id_echo_bot" to get your telegram_chat_id .
-> ![](https://raw.githubusercontent.com/abhiunix/images/main/2.png)
-
 
 # Usage:
 ```
-Usage of backup
-Basic: Go to any desired directory and enter `backup`. You will get backup of your current directory on your telegram bot.
-  
-  $ backup
+telegram_backup [OPTION]...
 
-  $ crtsh -d abhiunix.in | tee abhiunix.subdmains.txt ; backup
+Backup Wordpress Codebase + Database.
+Version 0.1.0
 
-  $ sqlmap -u http://testphp.vulnweb.com/artists.php?artist=2 --dbs --banner --batch | tee output.txt ; backup
+    Options:
+        -tc,    --telegram-chat-id   Telegram chat_id - mandatory
+        -tt,    --telegram-bot-token Telegram bot token - mandatory
+        -bd,    --dir-to-backup      Directory to backup - default=/home/wordpress/html
+        -bs,    --storage-dir        Backup storage directory - default=/home/userdir/backups
+        -uc,    --use-mysql-config   Use MySQL config file (~/.my.cnf)
+        -bn,    --backup-name        Backup filename without extension - default userdir
+        -bk,    --backup-keep-days   Days of backup to keep in storage - default 0 (none)
+        -nw,    --not-wordpress      This is not a workdpress backup - default is wordpress
+        -dh     --database-host      Database host - mandatory for not wordpress unless using MySQL config
+        -dn     --database-name      Database name - mandatory for not wordpress unless using MySQL config
+        -dp     --database-pass      Database name - mandatory for not wordpress unless using MySQL config
+        -h,     --help               Display this help and exit
+        -v,     --version            Output version information and exit
+
+    Example for wordpress:
+    telegram_backup --telegram-chat-id=569502265 --telegram-bot-token=UU7grZ_ZunE-9ijNeq5dmE4t-u85gTzrNdc
+
+    Example for none wordpress:
+    telegram_backup --not-wordpress --use-mysql-config --telegram-chat-id=569502265 --telegram-bot-token=UU7grZ_ZunE-9ijNeq5dmE4t-u85gTzrNdc
 ```
-
-### Demo:
-
-
-> ![](https://raw.githubusercontent.com/abhiunix/images/master/usage.gif)
-
-
