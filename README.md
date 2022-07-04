@@ -17,8 +17,9 @@ You need to provide your telegram_apikey and telegram_chat_id on the command lin
 - Select the Bot User from the Group members list,
 - Press the SEND MESSAGE button (to send the start),
 - Send the User a message.
-- Retrieve the Chat ID from the chat data using this tool. 
+- Visit https://codesandbox.io/s/get-telegram-chat-id-q3qkk
 - Check the js code if you like in the sandbox before putting your token in
+- Retrieve the Chat ID from the chat data using this tool.
  
 
 # Usage:
