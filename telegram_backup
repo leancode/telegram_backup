@@ -317,29 +317,52 @@ function sanitize_args()
 
 function create_backup()
 {
-    _success "Dumping MySQL..."
     BACKUP_FILE="${BACKUP_STORAGE_DIR_ABS}/${BACKUP_NAME}"
     local host username password db_name
 
     host=$(grep DB_HOST "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d "'" -f 4)
     if [[ -z "$host" ]]; then
         host=$(grep DB_HOST "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
-    fi  
-
-    username=$(grep DB_USER "${DIR_TO_BACKUP_ABS}/wp-config.php" | cut -d "'" -f 4)
-    if [[ -z "$username" ]]; then
-        username=$(grep DB_USER "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
-    fi  
-
-    password=$(grep DB_PASSWORD "${DIR_TO_BACKUP_ABS}/wp-config.php" | cut -d "'" -f 4)
-    if [[ -z "$password" ]]; then
-        password=$(grep DB_PASSWORD "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
-    fi  
+    fi
+    if [[ -z "$host" ]]; then
+        _error "We did not get the mysql host. Set it manually"
+        die
+    fi
 
     db_name=$(grep DB_NAME "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d "'" -f 4)
     if [[ -z "$db_name" ]]; then
         db_name=$(grep DB_NAME "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
     fi  
+    if [[ -z "$db_name" ]]; then
+        _error "We did not get the mysql name. Set it manually"
+        die
+    fi
+
+    username=$(grep DB_USER "${DIR_TO_BACKUP_ABS}/wp-config.php" | cut -d "'" -f 4)
+    if [[ -z "$username" ]]; then
+        username=$(grep DB_USER "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
+    fi  
+    if [[ -z "$username" ]]; then
+        _error "We did not get the mysql user. Set it manually"
+        die
+    fi
+
+    password=$(grep DB_PASSWORD "${DIR_TO_BACKUP_ABS}/wp-config.php" | cut -d "'" -f 4)
+    if [[ -z "$password" ]]; then
+        password=$(grep DB_PASSWORD "${DIR_TO_BACKUP_ABS}/wp-config.php" |cut -d '"' -f 2)
+    fi  
+    if [[ -z "$password" ]]; then
+        _error "We did not get the mysql pass. Set it manually"
+        die
+    fi
+    _success "Trying mysql connect with host=$host name=$db_name user=$username pass=xxx..."
+
+    while ! mysql -h "$host" -u "$username" -p"$password" "$db_name" -e ";" ; do
+           _error "Can't connect to mysql. Please check why, fix and retry."
+           die
+    done
+    
+    _success "Archiving database..."
 
     # @todo option to skip log tables
     if [[ "$USE_MYSQL_CONFIG" -eq 1 ]]; then
@@ -347,7 +370,6 @@ function create_backup()
     else
         mysqldump --single-transaction -h "$host" -u "$username" -p"$password" "$db_name" > "$BACKUP_FILE.sql"
     fi 	
-    _success "Done!"
 
     _success "Archiving Codebase..."
     declare -a EXC_PATH
@@ -366,8 +388,6 @@ function create_backup()
 
     tar -cf "$BACKUP_FILE.code.tar" ${EXCLUDES} -C "${DIR_TO_BACKUP_ABS}" .
 
-	_success "Done!"
-
     _success "Compressing Archives..."
 
     BACKUP_FILE_STRIPPED="${BACKUP_FILE:1}"
@@ -377,7 +397,6 @@ function create_backup()
 
     rm "$BACKUP_FILE.sql"
     rm "$BACKUP_FILE.code.tar"
-	_success "Done!"
 }
 
 function delete_old_backups() {
@@ -415,26 +434,22 @@ function send_to_telegram()
     telegram_send_message "/-----Begin $DIR_CURRENT backup $HUMAN_DATETIME"
     if [ $BACKUP_SIZE -le 49000000 ]; then
         # Send backup file to Telegram
-    	_success "Done!"
         _success "Sending to Telegram..."
         telegram_send_document $ZIPPED_BACKUP_FILE "This is a backup of $DIR_CURRENT"
     else
         # Split backup file, then send to Telegram
-        PARTIAL_ZIP_FILE="${BACKUP_STORAGE_DIR_ABS}/partial-${BACKUP_NAME}-backup.tar"
+        PARTIAL_ZIP_FILE="${BACKUP_STORAGE_DIR_ABS}/partial-${BACKUP_NAME}-backup"
         zip -q -r -s 49m "$PARTIAL_ZIP_FILE.zip" "$ZIPPED_BACKUP_FILE"
-        NUMBER_OF_PARTS=$(($BACKUP_SIZE / 49000000))
-    	_success "Done!"
-        _success "Sending 1 of $(($NUMBER_OF_PARTS+1)) to Telegram..."
-        telegram_send_document "$PARTIAL_ZIP_FILE.zip" "Part 1 of $DIR_CURRENT multipart backup"
+        NUMBER_OF_PARTS=`ls -1q ${PARTIAL_ZIP_FILE}.* | wc -l`
+        _success "Sending 1 of $NUMBER_OF_PARTS to Telegram..."
+        telegram_send_document "$PARTIAL_ZIP_FILE.zip" "Part 1 of $NUMBER_OF_PARTS multipart backup"
         rm "$PARTIAL_ZIP_FILE.zip"
-    	_success "Done!"
         COUNTER=2
-        for i in $(seq -f "%02g" 1 $NUMBER_OF_PARTS); do
-            _success "Sending $COUNTER of $(($NUMBER_OF_PARTS+1)) to Telegram..."
-            telegram_send_document "$PARTIAL_ZIP_FILE.z$i" "Part $COUNTER of $DIR_CURRENT multipart backup"
-            COUNTER=$COUNTER+1
+        for i in $(seq -f "%02g" 1 $(($NUMBER_OF_PARTS-1))); do
+            _success "Sending $COUNTER of $NUMBER_OF_PARTS to Telegram..."
+            telegram_send_document "$PARTIAL_ZIP_FILE.z$i" "Part $COUNTER of $NUMBER_OF_PARTS multipart backup"
+            COUNTER=$(($COUNTER+1))
             rm "$PARTIAL_ZIP_FILE.z$i"
-        	_success "Done!"
         done
     fi
     telegram_send_message "\-----End $DIR_CURRENT backup $HUMAN_DATETIME"
